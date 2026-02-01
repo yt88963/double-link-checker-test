@@ -1,9 +1,12 @@
 {
-  "name": "double-link-checker-test",
+  "name": "double-link-checker",
   "version": "1.0.0",
   "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
   "dependencies": {
     "express": "^4.18.2",
-    "@line/bot-sdk": "^8.5.3"
+    "@line/bot-sdk": "^7.7.0"
   }
 }
