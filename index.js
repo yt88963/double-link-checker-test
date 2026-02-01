@@ -1,4 +1,3 @@
-// index.js
 const express = require('express');
 const fs = require('fs');
 const bodyParser = require('body-parser');
@@ -13,51 +12,60 @@ const client = new Client({
   channelSecret: process.env.CHANNEL_SECRET,
 });
 
-// ===== リンク永続化用ファイル =====
+// ===== リンク保存 =====
 const LINKS_FILE = 'links.json';
 let sentLinks = [];
 
-// links.json があれば読み込む
 if (fs.existsSync(LINKS_FILE)) {
   try {
     sentLinks = JSON.parse(fs.readFileSync(LINKS_FILE));
-  } catch (e) {
-    console.error('links.json 読み込み失敗', e);
+  } catch {
     sentLinks = [];
   }
 }
 
-// ===== Webhook受信 =====
-app.post('/webhook', (req, res) => {
+// ===== Webhook =====
+app.post('/webhook', async (req, res) => {
   res.sendStatus(200);
 
   const events = req.body.events || [];
-  events.forEach(async (event) => {
-    if (event.type !== 'message' || event.message.type !== 'text') return;
+
+  for (const event of events) {
+    if (event.type !== 'message' || event.message.type !== 'text') continue;
 
     const text = event.message.text;
-    // 対象SNSリンクかチェック
-    const regex = /(https?:\/\/(?:www\.)?(instagram\.com|x\.com|twitter\.com|tiktok\.com|youtube\.com)[^\s]*)/gi;
+    const regex =
+      /(https?:\/\/(?:www\.)?(instagram\.com|x\.com|twitter\.com|tiktok\.com|youtube\.com)[^\s]*)/gi;
+
     const matches = text.match(regex);
-    if (!matches) return;
+    if (!matches) continue;
+
+    const duplicated = [];
 
     for (const url of matches) {
       if (sentLinks.includes(url)) {
-        // 既出リンクなら警告
-        await client.replyMessage(event.replyToken, {
-          type: 'text',
-          text: '⚠️ このリンクはすでに送られています',
-        });
+        duplicated.push(url);
       } else {
-        // 新規リンクなら保存
         sentLinks.push(url);
-        fs.writeFileSync(LINKS_FILE, JSON.stringify(sentLinks, null, 2));
       }
     }
-  });
+
+    fs.writeFileSync(LINKS_FILE, JSON.stringify(sentLinks, null, 2));
+
+    if (duplicated.length > 0) {
+      const message =
+        '⚠️ すでに送られているリンクがあります\n\n' +
+        duplicated.map(u => `・${u}`).join('\n');
+
+      await client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: message,
+      });
+    }
+  }
 });
 
-// ===== Render対応ポートで起動 =====
+// ===== 起動 =====
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
