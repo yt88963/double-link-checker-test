@@ -1,7 +1,8 @@
+// index.js
 const express = require('express');
-const fs = require('fs');
 const bodyParser = require('body-parser');
 const { Client } = require('@line/bot-sdk');
+const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 app.use(bodyParser.json());
@@ -12,17 +13,11 @@ const client = new Client({
   channelSecret: process.env.CHANNEL_SECRET,
 });
 
-// ===== リンク保存 =====
-const LINKS_FILE = 'links.json';
-let sentLinks = [];
-
-if (fs.existsSync(LINKS_FILE)) {
-  try {
-    sentLinks = JSON.parse(fs.readFileSync(LINKS_FILE));
-  } catch {
-    sentLinks = [];
-  }
-}
+// ===== Supabase設定 =====
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY
+);
 
 // ===== Webhook =====
 app.post('/webhook', async (req, res) => {
@@ -34,38 +29,33 @@ app.post('/webhook', async (req, res) => {
     if (event.type !== 'message' || event.message.type !== 'text') continue;
 
     const text = event.message.text;
-    const regex =
-      /(https?:\/\/(?:www\.)?(instagram\.com|x\.com|twitter\.com|tiktok\.com|youtube\.com)[^\s]*)/gi;
-
+    const regex = /(https?:\/\/(?:www\.)?(instagram\.com|x\.com|twitter\.com|tiktok\.com|youtube\.com)[^\s]*)/gi;
     const matches = text.match(regex);
     if (!matches) continue;
 
-    const duplicated = [];
-
     for (const url of matches) {
-      if (sentLinks.includes(url)) {
-        duplicated.push(url);
+      // ① Supabaseに既存チェック
+      const { data } = await supabase
+        .from('links')
+        .select('url')
+        .eq('url', url)
+        .maybeSingle();
+
+      if (data) {
+        // ② すでにある → 警告
+        await client.replyMessage(event.replyToken, {
+          type: 'text',
+          text: `⚠️ このリンクはすでに送られています\n${url}`,
+        });
       } else {
-        sentLinks.push(url);
+        // ③ なければ保存
+        await supabase.from('links').insert([{ url }]);
       }
-    }
-
-    fs.writeFileSync(LINKS_FILE, JSON.stringify(sentLinks, null, 2));
-
-    if (duplicated.length > 0) {
-      const message =
-        '⚠️ すでに送られているリンクがあります\n\n' +
-        duplicated.map(u => `・${u}`).join('\n');
-
-      await client.replyMessage(event.replyToken, {
-        type: 'text',
-        text: message,
-      });
     }
   }
 });
 
-// ===== 起動 =====
+// ===== Render対応 =====
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
