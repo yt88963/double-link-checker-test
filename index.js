@@ -21,6 +21,8 @@ const supabase = createClient(
 
 // ===== Webhook =====
 app.post('/webhook', async (req, res) => {
+   console.log('📩 Webhook received');
+  console.log(JSON.stringify(req.body, null, 2));
   res.sendStatus(200);
 
   const events = req.body.events || [];
