@@ -41,6 +41,7 @@ app.post('/webhook', async (req, res) => {
         .from('links')
         .select('url')
         .eq('url', url)
+        .eq('db_group', DB_GROUP)
         .maybeSingle();
 
       if (data) {
@@ -51,7 +52,10 @@ app.post('/webhook', async (req, res) => {
         });
       } else {
         // ③ なければ保存
-        await supabase.from('links').insert([{ url }]);
+        await supabase.from('links').insert([ {
+      url,
+      db_group: DB_GROUP,
+    },]);
       }
     }
   }
