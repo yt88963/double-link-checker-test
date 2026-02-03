@@ -18,6 +18,8 @@ const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_ANON_KEY
 );
+const DB_GROUP = 'core';
+
 
 // ===== Webhook =====
 app.post('/webhook', async (req, res) => {
@@ -47,7 +49,7 @@ if (event.source.type === 'group') {
         .from('links')
         .select('url')
         .eq('url', url)
-     　　.eq('db_group', dbGroup)
+     　　.eq('db_group', DB_GROUP)
         .maybeSingle();
 
       if (data) {
@@ -58,10 +60,7 @@ if (event.source.type === 'group') {
         });
       } else {
         // ③ なければ保存
-        await supabase.from('links').insert([ {
-      url,
-      db_group: dbGroup,
-    },]);
+        await supabase.from('links').insert([ { url, db_group: DB_GROUP },]);
       }
     }
   }
