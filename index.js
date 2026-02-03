@@ -18,7 +18,7 @@ const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_ANON_KEY
 );
-const DB_GROUP = 'core';
+
 // ===== Webhook =====
 app.post('/webhook', async (req, res) => {
    console.log('📩 Webhook received');
@@ -28,6 +28,12 @@ app.post('/webhook', async (req, res) => {
   const events = req.body.events || [];
 
   for (const event of events) {
+    // ===== db_group 判定 =====
+let dbGroup = 'core';
+
+if (event.source.type === 'group') {
+  dbGroup = `group_${event.source.groupId}`;
+}
     if (event.type !== 'message' || event.message.type !== 'text') continue;
 
     const text = event.message.text;
@@ -41,7 +47,7 @@ app.post('/webhook', async (req, res) => {
         .from('links')
         .select('url')
         .eq('url', url)
-        .eq('db_group', DB_GROUP)
+     　　.eq('db_group', dbGroup)
         .maybeSingle();
 
       if (data) {
@@ -54,7 +60,7 @@ app.post('/webhook', async (req, res) => {
         // ③ なければ保存
         await supabase.from('links').insert([ {
       url,
-      db_group: DB_GROUP,
+      db_group: dbGroup,
     },]);
       }
     }
